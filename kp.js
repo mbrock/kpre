@@ -115,7 +115,7 @@ const observer = new ResizeObserver(entries => {
     const state = states.get(entry.target)
     if (!state) continue
     const w = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width
-    if (w === state.width) continue
+    if (Math.abs(w - state.width) < 0.5) continue
     state.width = w
     state.layoutKey = null
     pending.add(entry.target)
@@ -141,8 +141,20 @@ document.fonts?.addEventListener("loadingdone", () => {
 
 // Public API: register every <p> under `root` and keep them justified
 // across resizes and font swaps. Idempotent.
+//
+// On first pass we read widths and run K-P synchronously, so the page
+// paints already-justified rather than flashing a frame of greedy text
+// while we wait for the ResizeObserver to fire. The ResizeObserver still
+// owns subsequent updates; this just shortcuts the very first layout.
 export function justifyAll(root = document) {
-  for (const p of root.querySelectorAll("p")) justify(p)
+  const ps = root.querySelectorAll("p")
+  for (const p of ps) justify(p)
+  for (const p of ps) {
+    const state = states.get(p)
+    if (state.width > 0) continue
+    state.width = contentBoxWidth(p)
+    if (state.width > 0) wrap(p)
+  }
 }
 
 export function justify(p) {
@@ -159,6 +171,19 @@ export function justify(p) {
     layoutKey: null,
   })
   observer.observe(p)
+}
+
+// Read an element's content-box width synchronously. ResizeObserver hands
+// us this number in its entries, but it fires asynchronously; for the
+// initial load we compute the same value from getBoundingClientRect minus
+// padding and border. This is a one-shot read at load time, so the layout
+// it forces is harmless.
+function contentBoxWidth(el) {
+  const rect = el.getBoundingClientRect()
+  const cs = getComputedStyle(el)
+  const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0)
+  const borX = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0)
+  return rect.width - padX - borX
 }
 
 function schedule() {
