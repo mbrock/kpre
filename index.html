@@ -85,7 +85,9 @@
 
 <p>A small detail matters here. The browser's text shaper and the canvas's measureText agree on most things but disagree at the sub-pixel level. So the available width passed to K-P is the column width minus a couple of pixels, enough to absorb the disagreement. Without this margin, a line K-P thinks "just fits" can overflow when the browser actually renders it, and overflow-wrap may splat a word in half to satisfy the constraint.</p>
 
-<p>Hyphenation candidates come from Liang's English patterns via the hypher library, which pre-inserts soft hyphens at every legal break. K-P then picks which to honor, paying a small fixed cost per hyphen so that it prefers a clean space break when both work equally well. Rejected soft hyphens are dropped from the output entirely; the browser cannot break at a soft hyphen that is not there.</p>
+<p>This whole approach hinges on accurate width measurement. K-P needs to know how wide each segment of text will be when rendered, or it cannot evaluate the badness of any candidate line. Glyph measurement is delegated to <a href="https://github.com/chenglou/pretext">pretext.js</a>, Cheng Lou's small library that wraps the canvas measureText API with segmentation, a per-(font, glyph) cache, and a subtle handling of bidi and combining characters. Pretext is what makes the K-P numbers match what the browser will actually draw; this file is essentially a Knuth–Plass dynamic program and an output encoder wrapped around what pretext provides.</p>
+
+<p>Hyphenation candidates come from Liang's English patterns via the <a href="https://github.com/bramstein/hypher">hypher</a> library, which pre-inserts soft hyphens at every legal break. K-P then picks which to honor, paying a small fixed cost per hyphen so that it prefers a clean space break when both work equally well. Rejected soft hyphens are dropped from the output entirely; the browser cannot break at a soft hyphen that is not there.</p>
 
 <p>A ResizeObserver tells us when each paragraph's width changes. The new width is in the observer entry, so we never call getBoundingClientRect and never force the browser to flush layout to satisfy a read. Per paragraph we cache two things: the segment measurements, which are font-dependent and resize-stable, and the K-P decisions, which depend on width. On resize, only the latter is recomputed. On font swap, both.</p>
 
@@ -164,7 +166,7 @@
 <p>Mr. Bennet was so odd a mixture of quick parts, sarcastic humour, reserve, and caprice, that the experience of three-and-twenty years had been insufficient to make his wife understand his character. <em>Her</em> mind was less difficult to develop. She was a woman of mean understanding, little information, and uncertain temper. When she was discontented, she fancied herself nervous. The business of her life was to get her daughters married; its solace was visiting and news.</p>
 
 <footer>
-Source: <a href="https://github.com/mbrock/kpre">github.com/mbrock/kpre</a>. Resize the window to see the algorithm re-justify on the fly. Body text by Jane Austen, 1813. Algorithm by Donald E. Knuth and Michael F. Plass, 1981.
+Source: <a href="https://github.com/mbrock/kpre">github.com/mbrock/kpre</a>. Resize the window to see the algorithm re-justify on the fly. Built on <a href="https://github.com/chenglou/pretext">pretext.js</a> (Cheng Lou) for canvas-based glyph measurement and <a href="https://github.com/bramstein/hypher">hypher</a> (Bram Stein) for Liang hyphenation patterns. Algorithm by Donald E. Knuth and Michael F. Plass, 1981. Body text by Jane Austen, 1813.
 </footer>
 
 </main>
